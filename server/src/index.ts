@@ -36,6 +36,10 @@ io.on('connection', (socket) => {
     socket.to(data.roomId).emit('draw', data)
   })
 
+  socket.on('clear-canvas', (data: { roomId: string }) => {
+    socket.to(data.roomId).emit('clear-canvas')
+  })
+
   socket.on('cursor-move', (data) => {
     socket.to(data.roomId).emit('cursor-move', {
       userId: socket.id,
