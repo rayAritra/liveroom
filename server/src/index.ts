@@ -42,6 +42,10 @@ app.get('/health', (_req: Request, res: Response) => {
   res.json({ status: 'ok' })
 })
 
+app.get('/', (_req: Request, res: Response) => {
+  res.send('LiveRoom WebRTC Server is running!')
+})
+
 io.on('connection', (socket) => {
   console.log('connected:', socket.id)
 
