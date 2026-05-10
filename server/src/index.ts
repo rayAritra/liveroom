@@ -15,20 +15,14 @@ interface DrawEvent {
 
 const roomDrawings: Record<string, DrawEvent[]> = {}
 
-const ALLOWED_ORIGINS = [
-  'http://localhost:3000',
-  'https://liveroom.vercel.app',
-  process.env.CLIENT_URL || '',
-].filter(Boolean)
-
 const app = express()
-app.use(cors({ origin: ALLOWED_ORIGINS }))
+app.use(cors({ origin: '*' }))
 app.use(express.json())
 
 const httpServer = createServer(app)
 const io = new Server(httpServer, {
   cors: {
-    origin: ALLOWED_ORIGINS,
+    origin: '*',
     methods: ['GET', 'POST'],
   },
 })
