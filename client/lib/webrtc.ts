@@ -24,6 +24,9 @@ export function setCallbacks(onStream: OnStreamCb, onRemove: OnRemoveCb) {
   onRemoveCb = onRemove
 }
 
+const candidateQueue: Record<string, RTCIceCandidateInit[]> = {}
+
+
 export async function getLocalStream(): Promise<MediaStream> {
   if (localStream) return localStream
   localStream = await navigator.mediaDevices.getUserMedia({
@@ -74,28 +77,58 @@ export async function handleOffer(
   userId: string,
   offer: RTCSessionDescriptionInit
 ) {
-    const peer = createPeer(userId)
+  const peer = createPeer(userId)
   await peer.setRemoteDescription(new RTCSessionDescription(offer))
   const answer = await peer.createAnswer()
   await peer.setLocalDescription(answer)
   socket.emit('answer', { to: userId, answer })
+
+  if (candidateQueue[userId]) {
+    for (const c of candidateQueue[userId]) {
+      await peer.addIceCandidate(new RTCIceCandidate(c)).catch(console.error)
+    }
+    delete candidateQueue[userId]
+  }
 }
 export async function handleAnswer(
   userId: string,
   answer: RTCSessionDescriptionInit
 ) {
-  await peers[userId]?.setRemoteDescription(new RTCSessionDescription(answer))
+  const peer = peers[userId]
+  if (!peer) return
+  await peer.setRemoteDescription(new RTCSessionDescription(answer))
+
+  if (candidateQueue[userId]) {
+    for (const c of candidateQueue[userId]) {
+      await peer.addIceCandidate(new RTCIceCandidate(c)).catch(console.error)
+    }
+    delete candidateQueue[userId]
+  }
 }
 
 export async function handleIceCandidate(
   userId: string,
   candidate: RTCIceCandidateInit
 ) {
-  await peers[userId]?.addIceCandidate(new RTCIceCandidate(candidate))
+  const peer = peers[userId]
+  if (!peer || !peer.remoteDescription) {
+    if (!candidateQueue[userId]) {
+      candidateQueue[userId] = []
+    }
+    candidateQueue[userId].push(candidate)
+    return
+  }
+  
+  try {
+    await peer.addIceCandidate(new RTCIceCandidate(candidate))
+  } catch (err) {
+    console.error('Failed to add ICE candidate', err)
+  }
 }
 export function stopAllConnections() {
   Object.values(peers).forEach((p) => p.close())
   Object.keys(peers).forEach((k) => delete peers[k])
+  Object.keys(candidateQueue).forEach((k) => delete candidateQueue[k])
   localStream?.getTracks().forEach((t) => t.stop())
   localStream = null
 }

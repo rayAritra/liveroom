@@ -33,6 +33,8 @@ export default function RoomPage() {
   const [username, setUsername] = useState('Anonymous')
 
   useEffect(() => {
+    let mounted = true
+
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setUsername(localStorage.getItem('username') || 'Anonymous')
 
@@ -49,53 +51,64 @@ export default function RoomPage() {
       }
     )
 
+    const onUserJoined = async (userId: string) => {
+      await callUser(userId)
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const onOffer = async ({ from, offer }: any) => {
+      await handleOffer(from, offer)
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const onAnswer = async ({ from, answer }: any) => {
+      await handleAnswer(from, answer)
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const onIceCandidate = async ({ from, candidate }: any) => {
+      await handleIceCandidate(from, candidate)
+    }
+
+    const onUserLeft = (userId: string) => {
+      setRemoteStreams((prev) => {
+        const next = { ...prev }
+        delete next[userId]
+        return next
+      })
+    }
+
     async function init() {
       try {
         const stream = await getLocalStream()
-        setLocalStream(stream)
+        if (mounted) {
+          setLocalStream(stream)
+        }
       } catch (err) {
         console.error('Camera/mic permission denied', err)
       }
 
+      if (!mounted) return
+
       socket.connect()
       socket.emit('join-room', roomId)
 
-      socket.on('user-joined', async (userId: string) => {
-        await callUser(userId)
-      })
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      socket.on('offer', async ({ from, offer }: any) => {
-        await handleOffer(from, offer)
-      })
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      socket.on('answer', async ({ from, answer }: any) => {
-        await handleAnswer(from, answer)
-      })
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      socket.on('ice-candidate', async ({ from, candidate }: any) => {
-        await handleIceCandidate(from, candidate)
-      })
-
-      socket.on('user-left', (userId: string) => {
-        setRemoteStreams((prev) => {
-          const next = { ...prev }
-          delete next[userId]
-          return next
-        })
-      })
+      socket.on('user-joined', onUserJoined)
+      socket.on('offer', onOffer)
+      socket.on('answer', onAnswer)
+      socket.on('ice-candidate', onIceCandidate)
+      socket.on('user-left', onUserLeft)
     }
 
     init()
 
     return () => {
-      socket.off('user-joined')
-      socket.off('offer')
-      socket.off('answer')
-      socket.off('ice-candidate')
-      socket.off('user-left')
+      mounted = false
+      socket.off('user-joined', onUserJoined)
+      socket.off('offer', onOffer)
+      socket.off('answer', onAnswer)
+      socket.off('ice-candidate', onIceCandidate)
+      socket.off('user-left', onUserLeft)
       socket.disconnect()
       stopAllConnections()
     }
