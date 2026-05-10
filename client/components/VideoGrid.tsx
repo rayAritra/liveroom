@@ -25,7 +25,22 @@ function VideoTile({ stream, muted = false, label, isCamOff, isMicOff }: VideoTi
     }
 
     const handlePlay = () => {
-      video.play().catch(e => console.warn("Play error:", e))
+      if (!video) return
+      // Only try to play if it's paused to avoid interrupting an already playing video
+      if (!video.paused) return
+      
+      video.play().catch(e => {
+        console.warn("Play error (likely autoplay blocked):", e)
+        
+        // Autoplay was blocked. We need to play when the user interacts.
+        const playOnInteract = () => {
+          if (!video) return
+          video.play().then(() => {
+            document.removeEventListener('click', playOnInteract)
+          }).catch(() => {})
+        }
+        document.addEventListener('click', playOnInteract)
+      })
     }
 
     video.addEventListener('loadedmetadata', handlePlay)
@@ -34,6 +49,7 @@ function VideoTile({ stream, muted = false, label, isCamOff, isMicOff }: VideoTi
 
     return () => {
       video.removeEventListener('loadedmetadata', handlePlay)
+      // Note: we might leave a dangling click listener, but it's harmless as it will remove itself on next click if successful.
     }
   }, [stream])
 

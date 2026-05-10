@@ -1,14 +1,22 @@
 import socket from './socket'
 
-const ICE_SERVERS = {
+const ICE_SERVERS: RTCConfiguration = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
-    {
-      urls: process.env.NEXT_PUBLIC_TURN_URL!,
-      username: process.env.NEXT_PUBLIC_TURN_USER!,
-      credential: process.env.NEXT_PUBLIC_TURN_CRED!,
-    },
   ],
+}
+
+if (
+  process.env.NEXT_PUBLIC_TURN_URL &&
+  process.env.NEXT_PUBLIC_TURN_USER &&
+  process.env.NEXT_PUBLIC_TURN_CRED &&
+  process.env.NEXT_PUBLIC_TURN_USER !== 'your_metered_username_here'
+) {
+  ICE_SERVERS.iceServers!.push({
+    urls: process.env.NEXT_PUBLIC_TURN_URL,
+    username: process.env.NEXT_PUBLIC_TURN_USER,
+    credential: process.env.NEXT_PUBLIC_TURN_CRED,
+  })
 }
 
 type OnStreamCb = (userId: string, stream: MediaStream) => void
